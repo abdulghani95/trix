@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#14573F">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>حاسبة الورق</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=Reem+Kufi:wght@500;700&display=swap">
+<style>
+/* Layout: one narrow column like a score pad; totals on top, entry panel in the middle, round log below. */
+:root{
+  --bg:#EDF1EE; --surface:#FFFFFF; --ink:#13261F; --muted:#5C6F67; --line:#D3DCD7;
+  --accent:#14573F; --accent-ink:#FFFFFF; --soft:#E1EAE5; --bad:#B3322A; --good:#1B7F4F;
+  --f-display:'Reem Kufi','IBM Plex Sans Arabic',system-ui,sans-serif;
+  --f-body:'IBM Plex Sans Arabic',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0C1713; --surface:#14241E; --ink:#E6EFEA; --muted:#93A79E; --line:#25382F;
+    --accent:#4FBF8E; --accent-ink:#06130D; --soft:#1B3128; --bad:#F07A6F; --good:#5FD39A; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0C1713; --surface:#14241E; --ink:#E6EFEA; --muted:#93A79E; --line:#25382F;
+  --accent:#4FBF8E; --accent-ink:#06130D; --soft:#1B3128; --bad:#F07A6F; --good:#5FD39A; color-scheme:dark;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5}
+*{box-sizing:border-box}
+#app{max-width:720px;margin:0 auto;padding-block:18px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:16px}
+h1{font-family:var(--f-display);font-size:28px;line-height:1.2;margin:0;font-weight:700}
+.sub{color:var(--muted);margin:2px 0 0;font-size:14px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--soft);padding:5px;border-radius:12px}
+.tab{border:0;background:transparent;padding:10px 6px;border-radius:8px;font-family:var(--f-display);font-size:17px;font-weight:700;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:14px}
+h2{font-family:var(--f-display);font-size:19px;margin:0;font-weight:700}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;min-height:40px;font-weight:500}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chip[disabled]{opacity:.35;cursor:not-allowed;text-decoration:line-through}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:10px 16px;min-height:44px;font-weight:600}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary[disabled]{opacity:.4;cursor:not-allowed}
+.btn.big{width:100%;font-size:17px;min-height:50px}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+input[type=text],input[type=number]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px;width:100%}
+.scores{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.sc{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.sc.lead{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.sc.out{opacity:.55}
+.sc-n{color:var(--muted);font-size:14px;overflow-wrap:anywhere;display:flex;justify-content:space-between;gap:6px}
+.sc-v{font-family:var(--f-display);font-size:34px;font-weight:700;line-height:1.15}
+.num{direction:ltr;unicode-bidi:isolate;font-variant-numeric:tabular-nums;display:inline-block}
+.neg{color:var(--bad)} .pos{color:var(--good)}
+.badge{font-size:12px;background:var(--bad);color:#fff;border-radius:6px;padding:0 6px;align-self:center}
+.bar{height:5px;background:var(--soft);border-radius:3px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--accent)}
+.kg{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;align-items:center}
+.kg b{font-weight:600;overflow-wrap:anywhere}
+.dots{display:flex;gap:5px;flex-wrap:wrap}
+.dot{font-size:12px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--muted)}
+.dot.done{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.field{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid var(--line);padding-top:10px}
+.field:first-of-type{border-top:0;padding-top:0}
+.field .who{font-weight:600;min-width:0;overflow-wrap:anywhere;flex:1}
+.step{display:flex;align-items:center;gap:6px}
+.step button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:22px;line-height:1}
+.step .v{min-width:30px;text-align:center;font-family:var(--f-display);font-size:22px}
+.pv{min-width:46px;text-align:left;font-weight:600}
+.hint{color:var(--muted);font-size:14px}
+.hint.ok{color:var(--good)}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:320px;font-size:14px}
+th,td{padding:8px 10px;text-align:center;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:right}
+thead th{color:var(--muted);font-weight:500;background:var(--soft)}
+tfoot td{font-weight:700;border-bottom:0;background:var(--soft)}
+.banner{background:var(--accent);color:var(--accent-ink);border-radius:14px;padding:14px 16px;font-family:var(--f-display);font-size:20px;font-weight:700}
+.limit{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center}
+.gin{display:flex;gap:6px;align-items:center}
+.gin button{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);font-size:20px}
+.foot{display:flex;gap:8px;flex-wrap:wrap}
+.empty{color:var(--muted);text-align:center;padding:18px 8px}
+body{margin:0}
+</style>
+
+</head>
+<body>
+<div id="app" dir="rtl" lang="ar"></div>
+
+<script>
+(function(){
+var KEY='card-calc-v1';
+var TREX={
+  king:{name:'ملك القلوب',short:'الملك',kind:'one',pts:-75},
+  queens:{name:'البنات',short:'بنات',kind:'count',pts:-25,total:4,unit:'بنت'},
+  diamonds:{name:'الديناري',short:'ديناري',kind:'count',pts:-10,total:13,unit:'ورقة'},
+  slaps:{name:'اللطش',short:'لطش',kind:'count',pts:-15,total:13,unit:'لمّة'},
+  trex:{name:'تركس',short:'تركس',kind:'rank',pts:[200,150,100,50]}
+};
+var TKEYS=['king','queens','diamonds','slaps','trex'];
+var ORD=['الأول','الثاني','الثالث','الرابع'];
+var TABS=[['trex','تركس'],['konkan','كونكان'],['f41','41']];
+
+function fresh(){return {tab:'trex',games:{
+  trex:{players:[],rounds:[]},
+  konkan:{players:[],rounds:[],limit:101,mode:'out'},
+  f41:{players:[],rounds:[],limit:41,mode:'win'}}};}
+var S=null;
+try{S=JSON.parse(localStorage.getItem(KEY));}catch(e){S=null;}
+if(!S||!S.games||!S.games.trex||!S.games.konkan||!S.games.f41)S=fresh();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+
+var D={
+  setup:{trex:{n:4,mode:'four',names:['','','','']},konkan:{n:4,names:[]},f41:{n:4,names:[]}},
+  trex:{open:false,owner:0,type:'king',vals:[0,0,0,0],king:null,ranks:[0,0,0,0]},
+  gvals:[],confirm:false
+};
+var app=document.getElementById('app');
+
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function sg(v){return v>0?'+'+v:v<0?'−'+(-v):'0';}
+function cls(v){return v>0?'pos':v<0?'neg':'';}
+function plain(v){return v<0?'−'+(-v):String(v);}
+function totals(g){var t=g.players.map(function(){return 0;});g.rounds.forEach(function(r){r.s.forEach(function(v,i){t[i]+=v;});});return t;}
+function sum(a){return a.reduce(function(x,y){return x+y;},0);}
+
+/* ---------- Trex logic ---------- */
+function doneSet(g,o){var s={};g.rounds.forEach(function(r){if(r.o===o)s[r.t]=true;});return s;}
+function doneCount(g,o){return Object.keys(doneSet(g,o)).length;}
+function defaultOwner(g){for(var o=0;o<4;o++){if(doneCount(g,o)<5)return o;}return null;}
+function firstFree(g,o){var d=doneSet(g,o);for(var i=0;i<TKEYS.length;i++){if(!d[TKEYS[i]])return TKEYS[i];}return null;}
+function tScores(type,d){
+  var c=TREX[type];
+  if(c.kind==='one')return d.vals.map(function(_,i){return d.king===i?c.pts:0;});
+  if(c.kind==='count')return d.vals.map(function(v){return v*c.pts;});
+  return d.ranks.map(function(r){return r?c.pts[r-1]:0;});
+}
+function ownLabel(g,o){return g.solo?'المملكة '+(o+1):g.players[o];}
+function kSub(g,o){var t=0;g.rounds.forEach(function(r){if(r.o===o)t+=r.s[0];});return t;}
+function tValid(type,d,solo){
+  var c=TREX[type];
+  if(solo){if(c.kind==='rank')return d.ranks[0]>0;return true;}
+  if(c.kind==='one')return d.king!==null;
+  if(c.kind==='count')return sum(d.vals)===c.total;
+  var seen={};
+  return d.ranks.every(function(r){if(!r||seen[r])return false;seen[r]=1;return true;});
+}
+
+/* ---------- Views ---------- */
+function header(){
+  var tabs=TABS.map(function(t){
+    return '<button class="tab" role="tab" aria-selected="'+(S.tab===t[0])+'" data-act="tab" data-v="'+t[0]+'">'+t[1]+'</button>';
+  }).join('');
+  return '<header><h1>حاسبة الورق</h1><p class="sub">احسب نقاط تركس وكونكان و41 جولة بجولة</p></header>'+
+         '<nav class="tabs" role="tablist">'+tabs+'</nav>';
+}
+
+function setupView(){
+  var d=D.setup[S.tab],fixed=S.tab==='trex',h='<section class="panel"><h2>لعبة جديدة</h2>';
+  var cnt=fixed?(d.mode==='solo'?1:4):d.n;
+  if(fixed){h+='<div style="display:flex;flex-direction:column;gap:8px"><div class="hint">طريقة التسجيل</div><div class="row"><button class="chip" aria-pressed="'+(d.mode!=='solo')+'" data-act="tmode" data-v="four">أربعة لاعبين</button><button class="chip" aria-pressed="'+(d.mode==='solo')+'" data-act="tmode" data-v="solo">لاعب واحد</button></div><p class="hint" style="margin:0">'+(d.mode==='solo'?'سجّل نقاطك أنت فقط في الممالك الأربع، ولكل مملكة خمس جولات، والمجموع واحد.':'تركس تُلعب بأربعة لاعبين، ولكل لاعب مملكة من خمس جولات.')+'</p></div>';}
+  else{
+    h+='<div><div class="hint" style="margin-bottom:6px">عدد اللاعبين</div><div class="row">';
+    for(var n=2;n<=6;n++)h+='<button class="chip" aria-pressed="'+(d.n===n)+'" data-act="n" data-v="'+n+'">'+n+'</button>';
+    h+='</div></div>';
+  }
+  h+='<div style="display:flex;flex-direction:column;gap:8px">';
+  for(var i=0;i<cnt;i++){
+    h+='<input type="text" id="nm'+i+'" data-f="name" data-i="'+i+'" placeholder="'+(cnt===1?'اسمك':'لاعب '+(i+1))+'" value="'+esc(d.names[i]||'')+'" autocomplete="off">';
+  }
+  h+='</div><button class="btn primary big" data-act="start">ابدأ اللعب</button></section>';
+  return h;
+}
+
+function endButtons(g){
+  var h='<div class="foot">';
+  h+='<button class="btn" data-act="undo"'+(g.rounds.length?'':' disabled')+'>تراجع عن آخر جولة</button>';
+  if(D.confirm){
+    h+='<button class="btn danger" data-act="reset-yes">نعم، احذف اللعبة</button><button class="btn" data-act="reset-no">إلغاء</button>';
+  }else{
+    h+='<button class="btn danger" data-act="reset">لعبة جديدة</button>';
+  }
+  return h+'</div>';
+}
+
+function logTable(g,labelFn){
+  var t=totals(g);
+  var h='<div class="tw"><table><thead><tr><th>الجولة</th>'+g.players.map(function(p){return '<th>'+esc(p)+'</th>';}).join('')+'</tr></thead><tbody>';
+  g.rounds.forEach(function(r,k){
+    h+='<tr><td>'+labelFn(r,k)+'</td>'+r.s.map(function(v){return '<td><span class="num '+cls(v)+'">'+sg(v)+'</span></td>';}).join('')+'</tr>';
+  });
+  h+='</tbody><tfoot><tr><td>المجموع</td>'+t.map(function(v){return '<td><span class="num">'+plain(v)+'</span></td>';}).join('')+'</tr></tfoot></table></div>';
+  return h;
+}
+
+function trexView(g){
+  var t=totals(g),best=Math.max.apply(null,t),h='';
+  if(g.rounds.length===20){
+    var win=g.players.filter(function(_,i){return t[i]===best;}).map(esc).join(' و ');
+    h+='<div class="banner">'+(g.solo?'انتهت اللعبة، مجموعك: <span class="num">'+plain(t[0])+'</span>':'انتهت اللعبة، الفائز: '+win)+'</div>';
+  }
+  h+='<section class="scores">'+g.players.map(function(p,i){
+    return '<div class="sc'+(g.rounds.length&&t[i]===best?' lead':'')+'"><span class="sc-n">'+esc(p)+'</span><span class="sc-v num '+cls(t[i])+'">'+plain(t[i])+'</span></div>';
+  }).join('')+'</section>';
+
+  h+='<section class="panel"><h2>الممالك</h2><div class="kg">';
+  for(var o=0;o<4;o++){
+    var p=ownLabel(g,o),sub=kSub(g,o),ds=doneSet(g,o);
+    h+='<b>'+esc(p)+(g.solo?' <span class="num '+cls(sub)+'">'+plain(sub)+'</span>':'')+'</b><div class="dots">'+TKEYS.map(function(k){return '<span class="dot'+(ds[k]?' done':'')+'">'+TREX[k].short+'</span>';}).join('')+'</div>';
+  }
+  h+='</div></section>';
+  h+=trexEntry(g);
+  if(g.rounds.length){
+    h+='<section style="display:flex;flex-direction:column;gap:10px"><h2>سجل الجولات</h2>'+
+       logTable(g,function(r){return esc(ownLabel(g,r.o))+' · '+TREX[r.t].short;})+'</section>';
+  }
+  return h+endButtons(g);
+}
+
+function trexEntry(g){
+  var d=D.trex;
+  if(!d.open){
+    if(defaultOwner(g)===null)return '';
+    return '<button class="btn primary big" data-act="newround">جولة جديدة</button>';
+  }
+  var type=d.type,c=TREX[type],ds=doneSet(g,d.owner),h='<section class="panel"><h2>جولة جديدة</h2>';
+  h+='<div><div class="hint" style="margin-bottom:6px">'+(g.solo?'المملكة':'صاحب المملكة')+'</div><div class="row">'+
+     [0,1,2,3].map(function(o){var p=ownLabel(g,o);return '<button class="chip" aria-pressed="'+(d.owner===o)+'" data-act="owner" data-v="'+o+'"'+(doneCount(g,o)>=5?' disabled':'')+'>'+esc(p)+'</button>';}).join('')+'</div></div>';
+  h+='<div><div class="hint" style="margin-bottom:6px">اللعبة</div><div class="row">'+
+     TKEYS.map(function(k){return '<button class="chip" aria-pressed="'+(type===k)+'" data-act="type" data-v="'+k+'"'+(ds[k]?' disabled':'')+'>'+TREX[k].name+'</button>';}).join('')+'</div></div>';
+  var sc=tScores(type,d);
+  if(c.kind==='one'){
+    h+='<div class="hint">'+(g.solo?'هل أخذت ورقة شايب القلوب؟':'من أخذ ورقة شايب القلوب؟')+' (−75)</div>';
+    g.players.forEach(function(p,i){
+      h+='<div class="field"><span class="who">'+esc(p)+'</span><button class="chip" aria-pressed="'+(d.king===i)+'" data-act="king" data-v="'+i+'">أخذها</button></div>';
+    });
+  }else if(c.kind==='count'){
+    var rem=c.total-sum(d.vals);
+    h+=g.solo?'<div class="hint">اختر عدد ما أخذته ('+plain(c.pts)+' للواحدة)</div>':'<div class="hint'+(rem===0?' ok':'')+'">المتبقي: '+rem+' من '+c.total+' ('+plain(c.pts)+' للواحدة)</div>';
+    g.players.forEach(function(p,i){
+      h+='<div class="field"><span class="who">'+esc(p)+'</span><div class="step"><button data-act="inc" data-i="'+i+'" data-d="-1" aria-label="أنقص">−</button><span class="v num">'+d.vals[i]+'</span><button data-act="inc" data-i="'+i+'" data-d="1" aria-label="زِد">+</button></div><span class="pv num '+cls(sc[i])+'">'+sg(sc[i])+'</span></div>';
+    });
+  }else{
+    h+='<div class="hint">'+(g.solo?'ما ترتيبك في خلوص الأوراق؟':'رتّب اللاعبين حسب ترتيب خلوص أوراقهم')+'</div>';
+    g.players.forEach(function(p,i){
+      h+='<div class="field" style="flex-wrap:wrap"><span class="who">'+esc(p)+'</span><span class="pv num '+cls(sc[i])+'">'+sg(sc[i])+'</span><div class="row" style="width:100%">';
+      for(var r=1;r<=4;r++)h+='<button class="chip" aria-pressed="'+(d.ranks[i]===r)+'" data-act="rank" data-i="'+i+'" data-v="'+r+'">'+ORD[r-1]+'</button>';
+      h+='</div></div>';
+    });
+  }
+  h+='<div class="row"><button class="btn primary" style="flex:1" data-act="saveround"'+(tValid(type,d,g.solo)?'':' disabled')+'>احفظ الجولة</button><button class="btn" data-act="cancel">إلغاء</button></div></section>';
+  return h;
+}
+
+function genStatus(g,t){
+  var L=g.limit,idx=t.map(function(_,i){return i;}),names=function(a){return a.map(function(i){return esc(g.players[i]);}).join(' و ');};
+  if(g.mode==='win'){
+    var hit=idx.filter(function(i){return t[i]>=L;});
+    if(!hit.length)return null;
+    var m=Math.max.apply(null,hit.map(function(i){return t[i];}));
+    return 'فاز '+names(hit.filter(function(i){return t[i]===m;}));
+  }
+  var out=idx.filter(function(i){return t[i]>=L;});
+  if(!out.length)return null;
+  var alive=idx.filter(function(i){return t[i]<L;});
+  if(alive.length===1)return 'فاز '+names(alive);
+  if(alive.length===0){var mn=Math.min.apply(null,t);return 'فاز '+names(idx.filter(function(i){return t[i]===mn;}));}
+  return null;
+}
+
+function genView(g){
+  var n=g.players.length,t=totals(g),h='',st=genStatus(g,t);
+  if(D.gvals.length!==n)D.gvals=g.players.map(function(){return '';});
+  if(st)h+='<div class="banner">'+st+'</div>';
+  var best=g.mode==='win'?Math.max.apply(null,t):Math.min.apply(null,t);
+  h+='<section class="scores">'+g.players.map(function(p,i){
+    var out=g.mode==='out'&&t[i]>=g.limit;
+    var pct=Math.max(0,Math.min(100,t[i]/g.limit*100));
+    return '<div class="sc'+(out?' out':'')+(g.rounds.length&&t[i]===best&&!out?' lead':'')+'"><span class="sc-n"><span>'+esc(p)+'</span>'+(out?'<span class="badge">خرج</span>':'')+'</span><span class="sc-v num">'+plain(t[i])+'</span><div class="bar"><i style="width:'+pct+'%"></i></div></div>';
+  }).join('')+'</section>';
+
+  h+='<section class="panel"><h2>إعدادات اللعبة</h2><div class="limit"><label for="limit" class="hint">الحد</label><input type="number" id="limit" inputmode="numeric" data-f="limit" value="'+g.limit+'"></div>'+
+     '<div class="row"><button class="chip" aria-pressed="'+(g.mode==='out')+'" data-act="mode" data-v="out">من يصل للحد يخسر</button><button class="chip" aria-pressed="'+(g.mode==='win')+'" data-act="mode" data-v="win">من يصل للحد يفوز</button></div></section>';
+
+  h+='<section class="panel"><h2>نقاط الجولة</h2>';
+  g.players.forEach(function(p,i){
+    h+='<div class="field"><label class="who" for="gv'+i+'">'+esc(p)+'</label><div class="gin"><input type="number" id="gv'+i+'" inputmode="numeric" data-f="gv" data-i="'+i+'" placeholder="0" value="'+esc(D.gvals[i])+'" style="width:100px"><button data-act="neg" data-i="'+i+'" aria-label="اقلب الإشارة">±</button></div></div>';
+  });
+  h+='<button class="btn primary big" data-act="gadd">احفظ الجولة</button></section>';
+  if(g.rounds.length){
+    h+='<section style="display:flex;flex-direction:column;gap:10px"><h2>سجل الجولات</h2>'+
+       logTable(g,function(r,k){return 'جولة '+(k+1);})+'</section>';
+  }
+  return h+endButtons(g);
+}
+
+function render(){
+  var g=S.games[S.tab],h=header();
+  if(!g.players.length)h+=setupView();
+  else h+=(S.tab==='trex'?trexView(g):genView(g));
+  app.innerHTML=h;
+}
+
+/* ---------- Events ---------- */
+app.addEventListener('click',function(e){
+  var el=e.target.closest('[data-act]');
+  if(!el||el.disabled)return;
+  var a=el.dataset.act,v=el.dataset.v,i=+el.dataset.i,g=S.games[S.tab],d=D.trex;
+  if(a==='tab'){S.tab=v;D.confirm=false;D.trex.open=false;D.gvals=[];}
+  else if(a==='n'){var s=D.setup[S.tab];s.n=+v;}
+  else if(a==='tmode'){D.setup.trex.mode=v;}
+  else if(a==='start'){
+    var s2=D.setup[S.tab];var cnt=S.tab==='trex'?(s2.mode==='solo'?1:4):s2.n;if(S.tab==='trex')g.solo=(s2.mode==='solo');
+    g.players=[];for(var k=0;k<cnt;k++)g.players.push((s2.names[k]||'').trim()||(cnt===1?'أنا':'لاعب '+(k+1)));
+    g.rounds=[];D.gvals=[];
+  }
+  else if(a==='newround'){
+    var o=defaultOwner(g);if(o===null)return;
+    D.trex={open:true,owner:o,type:firstFree(g,o),vals:[0,0,0,0],king:null,ranks:[0,0,0,0]};
+  }
+  else if(a==='owner'){d.owner=+v;d.type=firstFree(g,d.owner);d.vals=[0,0,0,0];d.king=null;d.ranks=[0,0,0,0];}
+  else if(a==='type'){d.type=v;d.vals=[0,0,0,0];d.king=null;d.ranks=[0,0,0,0];}
+  else if(a==='king'){d.king=(d.king===+v)?null:+v;}
+  else if(a==='inc'){
+    var dl=+el.dataset.d,nv=d.vals[i]+dl,tot=TREX[d.type].total;
+    if(nv<0||(g.solo?nv>tot:sum(d.vals)+dl>tot))return;
+    d.vals[i]=nv;
+  }
+  else if(a==='rank'){
+    var r=+v;
+    if(d.ranks[i]===r){d.ranks[i]=0;}
+    else{for(var j=0;j<4;j++)if(d.ranks[j]===r)d.ranks[j]=0;d.ranks[i]=r;}
+  }
+  else if(a==='saveround'){
+    if(!tValid(d.type,d,g.solo))return;
+    g.rounds.push({o:d.owner,t:d.type,s:tScores(d.type,d).slice(0,g.players.length)});
+    d.open=false;
+  }
+  else if(a==='cancel'){d.open=false;}
+  else if(a==='undo'){g.rounds.pop();d.open=false;}
+  else if(a==='reset'){D.confirm=true;}
+  else if(a==='reset-no'){D.confirm=false;}
+  else if(a==='reset-yes'){g.players=[];g.rounds=[];D.confirm=false;D.gvals=[];d.open=false;}
+  else if(a==='mode'){g.mode=v;}
+  else if(a==='neg'){
+    var cur=parseFloat(D.gvals[i]);
+    D.gvals[i]=isNaN(cur)||cur===0?'-':String(-cur);
+    if(D.gvals[i]==='-')D.gvals[i]='';
+  }
+  else if(a==='gadd'){
+    var sc=D.gvals.map(function(x){var n=parseInt(x,10);return isNaN(n)?0:n;});
+    g.rounds.push({s:sc});D.gvals=g.players.map(function(){return '';});
+  }
+  save();render();
+});
+app.addEventListener('input',function(e){
+  var el=e.target,f=el.dataset.f;
+  if(f==='name'){D.setup[S.tab].names[+el.dataset.i]=el.value;}
+  else if(f==='gv'){D.gvals[+el.dataset.i]=el.value;}
+});
+app.addEventListener('change',function(e){
+  var el=e.target;
+  if(el.dataset.f==='limit'){
+    var n=parseInt(el.value,10),g=S.games[S.tab];
+    if(n>0){g.limit=n;}
+    save();render();
+  }
+});
+render();
+})();
+</script>
+
+<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
+</body>
+</html>
